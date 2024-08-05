@@ -12,3 +12,4 @@ In this repository, you can find the following files:
 - Preprocessing : preprocessing of the datasets.
 - Plots : All the R files to generates all the plots.
 - Functions : All the functions that I modified in order to generate and process the results.
+- Data : the type of data that I generated. 
