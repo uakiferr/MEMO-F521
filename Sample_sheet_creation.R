@@ -1,7 +1,7 @@
 ##########
 # Charging all the csv created for each dataset. 
 
-GSE97362 <- read.csv( "/Users/Asus/Documents/GSEs/GSE97362/97362_sample_sheet.csv")
+GSE97362 <- read.csv( "path/to/the/sample/sheet/created/for/GSE/97362_sample_sheet.csv")
 
 ############
 # Load the dplyr package
@@ -77,7 +77,7 @@ barplot(table(CHD7$gender.ch1,CHD7$Group))
 boxplot(KMT2D$age..years..ch1 ~ KMT2D$Group)
 boxplot(CHD7$age..years..ch1~ CHD7$Group)
 
-basedir <- "/Users/Asus/Documents/GSEs/GSE97362"
+basedir <- "/path/to/GSE97362"
 file_name <- "KMT2D.csv"
 full_path <- file.path(basedir, file_name)
 write.csv(KMT2D,file =full_path,row.names = FALSE)
@@ -90,7 +90,6 @@ write.csv(CHD7,file =full_path,row.names = FALSE)
 ##Taking the validation cohort to be my transformed/not transformed group
 
 Validation$age..years..ch1 <- as.numeric(Validation$age..years..ch1)
-
 rm(Controls,m_CHD7, file_name, n, full_path, m_KMT2D)
 
 
