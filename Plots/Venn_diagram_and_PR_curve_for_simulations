@@ -1,0 +1,344 @@
+library(ChIPpeakAnno)
+library(IRanges)
+library(GenomicRanges)
+
+
+
+
+###### Builds overlapps for the DMR detection function ######
+
+BuildOverlaps <- function(bestResultsDir,
+                          delta = c(0.1, 0.2, 0.3, 0.4),
+                          seed = c(100, 210, 330, 450, 680),
+                          CPGs_df = cpgLocation_df,
+                          min.cpgs = 5){
+  
+  ### List Results Files  ###
+  fileNames_char <- list.files(bestResultsDir)
+  targetNames_char <- paste0("delta", delta, "_seed", seed)
+  correctFiles_idx <- grep(targetNames_char, fileNames_char)
+  correctNames_char <- fileNames_char[correctFiles_idx]
+  names(correctNames_char) <- sapply(
+    strsplit(correctNames_char, "_"),
+    function(x){
+      gsub(pattern = "Results", replacement = "", x[1])
+    }
+  )
+  
+  ### Load and Clean Appropriate Files  ###
+  allRes_ls <- lapply(correctNames_char, function(x){
+    
+    res_ls <- readRDS(paste0(bestResultsDir, x))
+    
+    if(grepl("Combp", x)){
+      
+      results_df <- StandardizeOutput(
+        methodOut_df = res_ls[[1]],
+        method = "Comb_p",
+        cpgLocation_df = CPGs_df
+      )
+      
+      # The raw Comb-p results were filtered to > 1, not > 4.
+      results_df <- results_df[results_df$dmr.n.cpgs >= min.cpgs, ]
+      res_ls[[1]] <- results_df
+      
+    }
+    
+    results_df <- res_ls[[1]]
+    keepRows <- rowSums(is.na(results_df)) != ncol(results_df)
+    results_df <- results_df[keepRows, ]
+    
+    if(nrow(results_df) > 0){
+      
+      results_IRanges <- IRanges(
+        start = results_df$dmr.start,
+        end = results_df$dmr.end
+      )
+      GRanges(
+        seqnames = results_df$dmr.chr,
+        ranges = results_IRanges
+      )
+      
+    }
+    
+  })
+  
+  ###  Return  ###
+  attr(allRes_ls, "delta") <- delta
+  attr(allRes_ls, "repl")  <- which(c(110, 220, 340, 460, 690) %in% seed)
+  allRes_ls
+  
+}
+PlotOverlaps <- function(bestResultsDir,
+                         figFileName,
+                         device = pdf,
+                         plotTitle = "default",
+                         delta_num = c(0.025, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4),
+                         seeds_int = c(100, 210, 330, 450, 680),
+                         totalTest_int = 3063,
+                         CPGs_df = cpgLocation_df,
+                         min.cpgs = 5,
+                         ...) {
+  
+  # Group by seeds
+  design_mat <- expand.grid(seeds_int, delta_num)
+  cpg_df <- CPGs_df
+  minCPGs <- min.cpgs
+  
+  overlapsByMethods_ls <- lapply(1:nrow(design_mat), function(i) {
+    
+    overlaps_ls <- BuildOverlaps(
+      bestResultsDir = bestResultsDir,
+      delta = design_mat[i, 2], seed = design_mat[i, 1],
+      CPGs_df = cpg_df,
+      min.cpgs = minCPGs
+    )
+    overlapAttr <- attributes(overlaps_ls)
+    
+    null_idx <- sapply(overlaps_ls, is.null)
+    overlaps_ls <- overlaps_ls[!null_idx]
+    
+    attr(overlaps_ls, "delta") <- overlapAttr$delta
+    attr(overlaps_ls, "repl")  <- overlapAttr$repl
+    overlaps_ls
+    
+  })
+  
+  CreateHue <- function(n) {
+    hues = seq(15, 375, length = n + 1)
+    grDevices::hcl(h = hues, l = 65, c = 100)[1:n]
+  }
+  
+  # Loop through each combination of delta and seed
+  for (i in 1:nrow(design_mat)) {
+    delta <- design_mat[i, 2]
+    seed <- design_mat[i, 1]
+    
+    # Construct file name for each plot
+    currentFigFileName <- file.path(figFileName, paste0("plot_delta", delta, "_seed", seed, ".pdf"))
+    
+    device(file = currentFigFileName, ...)
+    
+    overlaps_ls <- overlapsByMethods_ls[[i]]
+    
+    delta_num <- attr(overlaps_ls, "delta")
+    repl_int  <- attr(overlaps_ls, "repl")
+    
+    currentPlotTitle <- if (plotTitle == "default") {
+      paste0("Venn Diagram for mu = ", delta_num, ", rep = ", repl_int)
+    } else {
+      plotTitle
+    }
+    
+    makeVennDiagram(
+      overlaps_ls, NameOfPeaks = names(overlaps_ls), totalTest = totalTest_int,
+      by = "region", fill = CreateHue(length(overlaps_ls)),
+      main = currentPlotTitle
+    )
+    
+    dev.off()
+  }
+}
+######### Build a PR curve list for each function best results #############
+
+BuildPRcurve <- function(bestResultsDir,
+                         delta = c(0.10, 0.25, 0.40),
+                         seed = c(110, 220, 340, 460, 690),
+                         beta_mat = betaVals_mat,
+                         AclustCPG_df = startEndCPG_df,
+                         CPGs_df = cpgLocation_df,
+                         min.cpgs = 5){
+  
+  ###  Gold Standard  ###
+  treatment_ls <- SimulateData(beta_mat = beta_mat,
+                               Aclusters_df = AclustCPG_df,
+                               delta_num = delta,
+                               seed_int = seed)
+  trueClusters_df <- treatment_ls$simAclusters_df
+  
+  ### List Results Files  ###
+  fileNames_char <- list.files(bestResultsDir)
+  targetNames_char <- paste0("delta", delta, "_seed", seed)
+  correctFiles_idx <- grep(targetNames_char, fileNames_char)
+  correctNames_char <- fileNames_char[correctFiles_idx]
+  names(correctNames_char) <- sapply(
+    strsplit(correctNames_char, "_"),
+    function(x){
+      gsub(pattern = "Results", replacement = "", x[1])
+    }
+  )
+  
+  ### Load and Clean Appropriate Files  ###
+  allRes_ls <- lapply(correctNames_char, function(x){
+    
+    res_ls <- readRDS(paste0(bestResultsDir, x))
+    
+    if(grepl("Combp", x)){
+      
+      results_df <- StandardizeOutput(
+        methodOut_df = res_ls[[1]],
+        method = "Comb_p",
+        cpgLocation_df = CPGs_df
+      )
+      
+      # The raw Comb-p results were filtered to > 1, not > 4.
+      results_df <- results_df[results_df$dmr.n.cpgs >= min.cpgs, ]
+      res_ls[[1]] <- results_df
+      
+    }
+    
+    CleanResults(dmrResults_ls = res_ls,
+                 Aclusters_df = trueClusters_df)
+    
+  })
+  
+  ###  Build PR Curves  ###
+  allPRs_ls <- lapply(allRes_ls, function(cleanDMR_df){
+    
+    if(!is.null(cleanDMR_df$dmr.n.cpgs)){
+      # This is because ProbeLasso randomly sucks for small delta.
+      
+      x_df <- cleanDMR_df[, c("aclust.order", "dmr.pval", "actual")]
+      x_df$status <- ifelse(x_df$actual == "positive", 1, 0)
+      x_df$dmr.pval[is.na(x_df$dmr.pval)] <- 1
+      
+      # take min pvalue of dmrs
+      agg_fmla <- as.formula("dmr.pval ~ aclust.order + actual + status")
+      x_df <- aggregate(agg_fmla, data = x_df, FUN = min)
+      
+      # PR curve
+      pr.curve(scores.class0 = 1 - x_df$dmr.pval,
+               weights.class0 = x_df$status,
+               curve = TRUE)
+      
+    } else {
+      NULL
+    }
+    
+  })
+  
+  ###  Return  ###
+  attr(allPRs_ls, "delta") <- delta
+  attr(allPRs_ls, "repl")  <- which(c(110, 220, 340, 460, 690) %in% seed)
+  allPRs_ls
+  
+}
+PlotPRCurve <- function(prCurves_ls,
+                        plotTitle = "default",
+                        new = TRUE,
+                        lineWidth = 1,
+                        colours = NULL){
+  
+  # Extract Meta
+  delta <- attr(prCurves_ls, "delta")
+  repl  <- attr(prCurves_ls, "repl")
+  
+  # Colours
+  if(is.null(colours)){
+    
+    CreateHue <- function(n){
+      
+      hues = seq(15, 375, length = n + 1)
+      hcl(h = hues, l = 65, c = 100)[1:n]
+      
+    }
+    
+    colours <- CreateHue(length(prCurves_ls))
+    
+  }
+  
+  # Foundation Plot
+  if(new){
+    
+    if(plotTitle == "default"){
+      plotTitle <- paste0(
+        "Precision-recall curve: mu = ", delta, ", rep = ", repl
+      )
+    }
+    
+    # Main
+    plot(
+      prCurves_ls[[1]],
+      color = colours[1],
+      auc.main = FALSE, legend = TRUE,
+      main = plotTitle,
+      cex.main = 1, lwd = lineWidth
+    )
+    
+    # Legend
+    legend(x = 0, y = 0.3,
+           legend = names(prCurves_ls),
+           col = colours, lty = 1, cex = 0.75, box.lty = 0)
+    
+  } else {
+    
+    plot(
+      prCurves_ls[[1]],
+      color = colours[1],
+      add = TRUE, legend = TRUE,
+      lwd = lineWidth
+    )
+    
+  }
+  
+  
+  # Subsequent
+  for(i in 2:length(prCurves_ls)){
+    
+    if(!is.null(prCurves_ls[[i]])){
+      plot(
+        prCurves_ls[[i]],
+        color = colours[i],
+        add = TRUE, legend = TRUE,
+        lwd = lineWidth
+      )
+    }
+    
+  }
+  
+}
+
+source("/path/to/functions/WriteProbeLassofunctions.R")
+
+##### Data needed #### 
+data.dir <-"/path/to/files/Simulation/"
+Aclusters_df <- read.csv(paste0(data.dir, "A-clust-results.csv"),
+                         header = TRUE)
+
+rownames(Aclusters_df) <- Aclusters_df$cpg
+beta_mat  <- read.csv(paste0(data.dir, "Beta_for_simu.csv"),
+                      row.names = 1, header = TRUE)
+
+bestResultsDir <- "/path/to/results/for/parameters/Best_results/"
+cpgLocation_df <-read.csv(paste0(data.dir, "cpgLocation_df.csv"),
+                              row.names = 1, header = TRUE) ## based on the DMRcompare, see Aclust-results. 
+
+deltas <- c(0.1, 0.25, 0.4)
+seeds <- c(110, 220, 340, 460, 690)
+  
+BuildPRC <- BuildPRcurve(bestResultsDir,
+                         delta = c(0.4), ##, 0.25, 0.40
+                         seed = c(690), ##110 , 220, 340, 460, 690
+                         beta_mat = beta_mat,
+                         AclustCPG_df = Aclusters_df,
+                         CPGs_df = cpgLocation_df,
+                         min.cpgs = 5) 
+PlotPRCurve(BuildPRC,
+            plotTitle = "default" ,
+            new = TRUE,
+            lineWidth = 1,
+            colours = NULL)
+
+  
+figFileName <-paste0(bestResultsDir,"Figure/")
+
+PlotOverlaps(bestResultsDir,
+             figFileName,
+             device = pdf,
+             plotTitle = "default",
+             delta = c(0.10,0.25, 0.40),
+             seed = c(110, 220, 340, 460, 690),
+             totalTest_int = 2479,
+             CPGs_df = cpgLocation_df,
+             min.cpgs = 5)
+
