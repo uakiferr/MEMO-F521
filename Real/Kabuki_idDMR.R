@@ -15,14 +15,13 @@ library(PRROC)
 ################ load all data needed for the analysis #######
 data.dir <-"/Users/Asus/Documents/GSEs/Kabuki/"
 
-Kabuki_dmr_df <- read.csv(paste0(data.dir, "Kabuki_DMR_to_find_true.csv"), header = TRUE)
+Kabuki_dmr_df <- read.csv(paste0(data.dir, "Kabuki_DMR_to_find_true.csv"), header = TRUE, row.names = 1)
 
 Kabuki_dmr_df$actual <- c(rep("positive", length(nrow(Kabuki_dmr_df))))
 
-rownames(Kabuki_dmr_df) <- Kabuki_dmr_df$cpg # making sure the row are the cgnames 
-
 beta_kabuki  <- read.csv(paste0(data.dir, "beta_kabuki.csv"),
                       row.names = 1, header = TRUE) ### Beta_mat filtered. in A-Clust-results
+
 CPGs_df <- read.csv(paste0(data.dir,"cpgLocation_df.csv"),
                     row.names = 1, header = TRUE) ## based on the DMRcompare, see Aclust-results. 
 
@@ -514,88 +513,6 @@ WriteidDMRResults(beta_kabuki,
                   verbose = TRUE)
 
 ###################### to process the data, clean and summarize results ###########
-CleanResults <- function(dmrResults_ls, Kabuki_dmr_df) {
-  
-  ranges_df <- dmrResults_ls[[1]]
-  # Remove rows with all NAs
-  ranges_df <- ranges_df[rowSums(is.na(ranges_df)) != ncol(ranges_df), ]
-  elapsedtime <- dmrResults_ls[[2]]
-  
-  clusters_df <- unique(
-    Kabuki_dmr_df[, c("Clusternumber",
-                      "chromosome",
-                      "start_position",
-                      "end_position", 
-                      "actual")]
-  )
-  
-  if(nrow(ranges_df) > 0){
-    
-    ###  Create GRanges  ###
-    # query = significant DMRs; need to limit to min.cpgs > 2 and pval < 0.05
-    signifRanges_df <-ranges_df[ranges_df$dmr.n.cpgs > 2 & ranges_df$dmr.pval < 0.05 & abs(ranges_df$maxdiff)> 0.1,  ]
-    query_GR <- GRanges(seqnames = signifRanges_df$dmr.chr,
-                        ranges = IRanges(signifRanges_df$dmr.start,
-                                         signifRanges_df$dmr.end))
-    
-    # subject = Aclusters
-    subject_GR <- GRanges(seqnames = clusters_df$chromosome,
-                          ranges = IRanges(clusters_df$start_position,
-                                           clusters_df$end_position))
-    
-    # subject-query overlap
-    overlap_df <- as.data.frame(
-      findOverlaps(query_GR, subject_GR, type = "any", select = "all")
-    )
-    overlap_df$dmr.order <- as.numeric(overlap_df$queryHits)
-    overlap_df$aclust.order <- as.numeric(overlap_df$subjectHits)
-    
-    
-    ###  Merge Results  ###
-    # merge with dmr info
-    signifRanges_df$dmr.row <- 1:nrow(signifRanges_df)
-    signifRanges_df$predicted <- "positive"
-    overlapDMRs_df <- merge(x = overlap_df, y = signifRanges_df,
-                            by.x = "dmr.order", by.y = "dmr.row", all = TRUE)
-    
-    # merge with aclust info
-    clusters_df$aclust.row <- 1:nrow(clusters_df)
-    
-    # merge all
-    all_df <- merge(x = overlapDMRs_df, y = clusters_df,
-                    by.x = "aclust.order", by.y = "aclust.row", all = TRUE)
-    
-  } else {
-    
-    all_df <- clusters_df
-    all_df$predicted <- "negative"
-    
-  }
-  
-  ###  Add Status Column  ###
-  all_df$predicted[is.na(all_df$predicted)] <- "negative"
-  all_df$actual[is.na(all_df$actual)] <- "negative"
-  
-  # True Positive
-  all_df$status[
-    all_df$actual == "positive" & all_df$predicted == "positive"
-  ] <- "TP"
-  
-  # False Negative
-  all_df$status[
-    all_df$actual == "positive" & all_df$predicted == "negative"
-  ] <- "FN"
-  
-  # False Positive
-  all_df$status[
-    all_df$actual == "negative" & all_df$predicted == "positive"
-  ] <- "FP"
-  
-  
-  ###  Return  ###
-  all_df
-  
-}
 SummarizeResults <- function(cleanDMR_df, time_num){
   # browser()
   
@@ -699,6 +616,92 @@ SummarizeResults <- function(cleanDMR_df, time_num){
   
 }
 
+
+#### Changed in order to process my Kabuki results: 
+### minimum number of cpg 3 
+CleanResults <- function(dmrResults_ls, Kabuki_dmr_df) {
+  
+  ranges_df <- dmrResults_ls[[1]]
+  # Remove rows with all NAs
+  ranges_df <- ranges_df[rowSums(is.na(ranges_df)) != ncol(ranges_df), ]
+  elapsedtime <- dmrResults_ls[[2]]
+  
+  clusters_df <- unique(
+    Kabuki_dmr_df[, c("Clusternumber",
+                      "chromosome",
+                      "start_position",
+                      "end_position", 
+                      "actual")]
+  )
+  
+  if(nrow(ranges_df) > 0){
+    
+    ###  Create GRanges  ###
+    # query = significant DMRs; need to limit to min.cpgs > 2 and pval < 0.05
+    signifRanges_df <-ranges_df[ranges_df$dmr.n.cpgs > 2 & ranges_df$dmr.pval < 0.05 & abs(ranges_df$maxdiff)> 0.1,  ]
+    query_GR <- GRanges(seqnames = signifRanges_df$dmr.chr,
+                        ranges = IRanges(signifRanges_df$dmr.start,
+                                         signifRanges_df$dmr.end))
+    
+    # subject = Aclusters
+    subject_GR <- GRanges(seqnames = clusters_df$chromosome,
+                          ranges = IRanges(clusters_df$start_position,
+                                           clusters_df$end_position))
+    
+    # subject-query overlap
+    overlap_df <- as.data.frame(
+      findOverlaps(query_GR, subject_GR, type = "any", select = "all")
+    )
+    overlap_df$dmr.order <- as.numeric(overlap_df$queryHits)
+    overlap_df$aclust.order <- as.numeric(overlap_df$subjectHits)
+    
+    
+    ###  Merge Results  ###
+    # merge with dmr info
+    signifRanges_df$dmr.row <- 1:nrow(signifRanges_df)
+    signifRanges_df$predicted <- "positive"
+    overlapDMRs_df <- merge(x = overlap_df, y = signifRanges_df,
+                            by.x = "dmr.order", by.y = "dmr.row", all = TRUE)
+    
+    # merge with aclust info
+    clusters_df$aclust.row <- 1:nrow(clusters_df)
+    
+    # merge all
+    all_df <- merge(x = overlapDMRs_df, y = clusters_df,
+                    by.x = "aclust.order", by.y = "aclust.row", all = TRUE)
+    
+  } else {
+    
+    all_df <- clusters_df
+    all_df$predicted <- "negative"
+    
+  }
+  
+  ###  Add Status Column  ###
+  all_df$predicted[is.na(all_df$predicted)] <- "negative"
+  all_df$actual[is.na(all_df$actual)] <- "negative"
+  
+  # True Positive
+  all_df$status[
+    all_df$actual == "positive" & all_df$predicted == "positive"
+  ] <- "TP"
+  
+  # False Negative
+  all_df$status[
+    all_df$actual == "positive" & all_df$predicted == "negative"
+  ] <- "FN"
+  
+  # False Positive
+  all_df$status[
+    all_df$actual == "negative" & all_df$predicted == "positive"
+  ] <- "FP"
+  
+  
+  ###  Return  ###
+  all_df
+  
+}
+
 ProcessidDMRResults <- function(resultsDir,
                                 Kabuki_dmr_df,
                                 verbose = TRUE){
@@ -798,5 +801,4 @@ ProcessidDMRResults <- function(resultsDir,
 idDMR_kabuki <- ProcessidDMRResults(resultsDir= resultsDir,
                                   Kabuki_dmr_df,
                                   verbose = TRUE)
-
 write.csv(idDMR_kabuki , file = paste0(resultsDir,"clean_DMR_idDMR_Kabuki.csv"))
