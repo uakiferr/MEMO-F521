@@ -545,9 +545,7 @@ CleanResults <- function(dmrResults_ls, Kabuki_dmr_df) {
   
 }
 
-
 ProcessDMRcateResults <- function(resultsDir,
-                                  beta_mat,
                                   AclustCPG_df,
                                   verbose = TRUE){
   # browser()
@@ -648,4 +646,3 @@ DMR_cate_kabuki <- ProcessDMRcateResults(resultsDir= resultsDir,
                                            verbose = TRUE)
 
 write.csv(DMR_cate_kabuki, file = paste0(resultsDir,"clean_DMR_cate_Kabuki.csv"))
-
