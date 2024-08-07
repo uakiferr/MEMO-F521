@@ -328,13 +328,13 @@ WriteProbeLassoResults(beta_kabuki,
                        verbose=TRUE)
 
 
- ######### Function for processing the results #####################
+######### Function for processing the results #####################
 
 SummarizeResults <- function(cleanDMR_df, time_num){
   # browser()
   
   ###  Table Power Results  ###
-  # Frequency count of each status - based on unique aclusters, for power
+  # Frequency count of each status for power
   #   calculation
   
   powerSummary_tbl <- table(
@@ -356,11 +356,11 @@ SummarizeResults <- function(cleanDMR_df, time_num){
     powerSummary_df[, c("time", "FN", "FP", "TN", "TP", "power", "nPower")]
   
   ###  Table Precision Results  ###
-  # Frequency count of each status - based on unique DMRs, for precision
+  # Frequency count of each status - based DMRs, for precision
   #   calculation
   if(!is.null(cleanDMR_df$dmr.order)){
     
-    statusDMR_df <- unique(cleanDMR_df[, c("dmr.order", "status")])
+    statusDMR_df <- cleanDMR_df[, c("dmr.order", "status")]
     
     precisSummary_tbl <- table(
       factor(statusDMR_df$status,
@@ -434,9 +434,10 @@ SummarizeResults <- function(cleanDMR_df, time_num){
 }
 
 
+
 #### Changed in order to process my Kabuki results: 
 ### minimum number of cpg 3 
-CleanResults <- function(dmrResults_ls, Kabuki_dmr_df) {
+CleanResults_PB <- function(dmrResults_ls, Kabuki_dmr_df) {
   
   ranges_df <- dmrResults_ls[[1]]
   # Remove rows with all NAs
@@ -455,7 +456,7 @@ CleanResults <- function(dmrResults_ls, Kabuki_dmr_df) {
     
     ###  Create GRanges  ###
     # query = significant DMRs; need to limit to min.cpgs > 2 and pval < 0.05
-    signifRanges_df <-ranges_df[ranges_df$dmr.n.cpgs > 2 & ranges_df$dmr.pval < 0.05 & abs(ranges_df$maxdiff)> 0.1,  ]
+    signifRanges_df <-ranges_df[ranges_df$dmr.n.cpgs > 2 & ranges_df$dmr.pval < 0.05 & abs((ranges_df$betaAv_Control)-(ranges_df$betaAv_Kabuki)) > 0.1,  ]
     query_GR <- GRanges(seqnames = signifRanges_df$dmr.chr,
                         ranges = IRanges(signifRanges_df$dmr.start,
                                          signifRanges_df$dmr.end))
@@ -551,7 +552,7 @@ ProcessProbeLassoResults <- function(resultsDir,
   aveLassoRad_int <- ExtractParamLevels(splitFileNames_ls, param = "meanLassoRd")
   minDmrSep_int <- ExtractParamLevels(splitFileNames_ls, param = "minDmrSep")
   
-  # This ensures that the delta values stay together, not the seed values.
+  # This ensures that the size values stay together, not the seed values.
   designPts_mat <- expand.grid(seeds_int, sizes_num)
   paramsGrid_mat <- expand.grid(pVals_num, aveLassoRad_int, minDmrSep_int)
   
@@ -564,7 +565,7 @@ ProcessProbeLassoResults <- function(resultsDir,
     ###  Generate Data Set  ###
     seed  <- designPts_mat[i, 1]
     size <- designPts_mat[i, 2]
- 
+    
     ###  Inner Results Comparison  ###
     innerOut_ls <- vector(mode = "list", length = nrow(paramsGrid_mat))
     for(j in 1:nrow(paramsGrid_mat)){
@@ -588,7 +589,7 @@ ProcessProbeLassoResults <- function(resultsDir,
       
       ###  Clean and Summarize Results  ###
       all_df <- CleanResults_PB(dmrResults_ls = res_ls,
-                             Kabuki_dmr_df = Kabuki_dmr_df)
+                                Kabuki_dmr_df = Kabuki_dmr_df)
       innerOut_df <- SummarizeResults(cleanDMR_df = all_df,
                                       time_num = res_ls[[2]])
       innerMeta_df <- data.frame(method = "ProbeLasso",
@@ -619,9 +620,10 @@ ProcessProbeLassoResults <- function(resultsDir,
   out_df
 }
 
+
 out <- ProcessProbeLassoResults(resultsDir,
                                 beta_kabuki,
                                 Kabuki_dmr_df,
                                 verbose = TRUE)
 
-write.csv(out, file = paste0("/path/to/your/files/Kabuki/Probelasso/","clean_DMR_PB_Kabuki.csv"))
+write.csv(out, file = paste0(resultsDir,"clean_DMR_PB_Kabuki.csv"))
