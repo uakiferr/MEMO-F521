@@ -522,7 +522,6 @@ CleanResults_PB <- function(dmrResults_ls, Kabuki_dmr_df) {
 
 
 ProcessProbeLassoResults <- function(resultsDir,
-                                     beta_kabuki,
                                      Kabuki_dmr_df,
                                      verbose = TRUE){
   # browser()
@@ -622,7 +621,6 @@ ProcessProbeLassoResults <- function(resultsDir,
 
 
 out <- ProcessProbeLassoResults(resultsDir,
-                                beta_kabuki,
                                 Kabuki_dmr_df,
                                 verbose = TRUE)
 
