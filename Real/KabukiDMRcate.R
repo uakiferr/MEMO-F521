@@ -28,7 +28,7 @@ beta_kabuki  <- read.csv(paste0(data.dir, "beta_kabuki.csv"),
 CPGs_df <- read.csv(paste0(data.dir, "cpgLocation_df.csv"),
                     row.names = 1, header = TRUE) ## based on the DMRcompare, see Aclust-results. 
 
-resultsDir <- "/path/to/your/files/Kabuki/DMRcate/"
+resultsDir <- "/Users/Asus/Documents/GSEs/Kabuki/DMRcate/"
 
 ### Make sure that row names are the cpgnames 
 rownames(Kabuki_dmr_df) 
@@ -360,7 +360,7 @@ SummarizeResults <- function(cleanDMR_df, time_num){
   # browser()
   
   ###  Table Power Results  ###
-  # Frequency count of each status - based on unique aclusters, for power
+  # Frequency count of each status for power
   #   calculation
   
   powerSummary_tbl <- table(
@@ -382,11 +382,11 @@ SummarizeResults <- function(cleanDMR_df, time_num){
     powerSummary_df[, c("time", "FN", "FP", "TN", "TP", "power", "nPower")]
   
   ###  Table Precision Results  ###
-  # Frequency count of each status - based on unique DMRs, for precision
+  # Frequency count of each status - based DMRs, for precision
   #   calculation
   if(!is.null(cleanDMR_df$dmr.order)){
     
-    statusDMR_df <- unique(cleanDMR_df[, c("dmr.order", "status")])
+    statusDMR_df <- cleanDMR_df[, c("dmr.order", "status")]
     
     precisSummary_tbl <- table(
       factor(statusDMR_df$status,
@@ -459,6 +459,7 @@ SummarizeResults <- function(cleanDMR_df, time_num){
   
 }
 
+
 #### Changed in order to process my Kabuki results: 
 ### minimum number of cpg 3 
 CleanResults <- function(dmrResults_ls, Kabuki_dmr_df) {
@@ -480,7 +481,7 @@ CleanResults <- function(dmrResults_ls, Kabuki_dmr_df) {
     
     ###  Create GRanges  ###
     # query = significant DMRs; need to limit to min.cpgs > 2 and pval < 0.05
-    signifRanges_df <-ranges_df[ranges_df$dmr.n.cpgs > 2 & ranges_df$dmr.pval < 0.05, ]
+    signifRanges_df <-ranges_df[ranges_df$dmr.n.cpgs > 2 & ranges_df$dmr.pval < 0.05 & abs(ranges_df$maxdiff)> 0.1,  ]
     query_GR <- GRanges(seqnames = signifRanges_df$dmr.chr,
                         ranges = IRanges(signifRanges_df$dmr.start,
                                          signifRanges_df$dmr.end))
@@ -538,15 +539,12 @@ CleanResults <- function(dmrResults_ls, Kabuki_dmr_df) {
     all_df$actual == "negative" & all_df$predicted == "positive"
   ] <- "FP"
   
-  # True Negative
-  all_df$status[
-    all_df$actual == "negative" & all_df$predicted == "negative"
-  ] <- "TN"
   
   ###  Return  ###
   all_df
   
 }
+
 
 ProcessDMRcateResults <- function(resultsDir,
                                   beta_mat,
@@ -645,9 +643,9 @@ ProcessDMRcateResults <- function(resultsDir,
   
 }
 
-DMR_cate_simu <- ProcessDMRcateResults(resultsDir= resultsDir,
-                                           beta_kabuki,
+DMR_cate_kabuki <- ProcessDMRcateResults(resultsDir= resultsDir,
                                            Kabuki_dmr_df,
                                            verbose = TRUE)
 
-write.csv(DMR_cate_simu, file = paste0(resultsDir,"clean_DMR_cate_Kabuki.csv"))
+write.csv(DMR_cate_kabuki, file = paste0(resultsDir,"clean_DMR_cate_Kabuki.csv"))
+
