@@ -29,8 +29,6 @@ BuildOverlaps <- function(BestResultsDir,
         ranges_df <- res_ls[[1]]
         results_df <-ranges_df[ranges_df$dmr.n.cpgs > 2 & ranges_df$dmr.pval < 0.05 & abs((ranges_df$betaAv_Control)-(ranges_df$betaAv_Kabuki)) > 0.1,  ]
         
-        
-        # The raw Comb-p results were filtered to > 1, not > 4.
         results_df <- results_df[results_df$dmr.n.cpgs >= min.cpgs, ]
         res_ls[[1]] <- results_df
         
