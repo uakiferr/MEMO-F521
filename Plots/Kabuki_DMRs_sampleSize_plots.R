@@ -204,7 +204,7 @@ CleanResults <- function(dmrResults_ls, Kabuki_dmr_df) {
     
     ###  Create GRanges  ###
     # query = significant DMRs; need to limit to min.cpgs > 2 and pval < 0.05
-    signifRanges_df <-ranges_df[ranges_df$dmr.n.cpgs > 2 & ranges_df$dmr.pval < 0.05 & abs(ranges_df$maxdiff)> 0.1,  ]
+    signifRanges_df <-ranges_df[ranges_df$dmr.n.cpgs > 2 & ranges_df$dmr.pval < 0.05 & abs(ranges_df$meandiff)> 0.1,  ]
     query_GR <- GRanges(seqnames = signifRanges_df$dmr.chr,
                         ranges = IRanges(signifRanges_df$dmr.start,
                                          signifRanges_df$dmr.end))
