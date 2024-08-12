@@ -29,21 +29,6 @@ BuildOverlaps <- function(bestResultsDir,
   allRes_ls <- lapply(correctNames_char, function(x){
     
     res_ls <- readRDS(paste0(bestResultsDir, x))
-    
-    if(grepl("Combp", x)){
-      
-      results_df <- StandardizeOutput(
-        methodOut_df = res_ls[[1]],
-        method = "Comb_p",
-        cpgLocation_df = CPGs_df
-      )
-      
-      # The raw Comb-p results were filtered to > 1, not > 4.
-      results_df <- results_df[results_df$dmr.n.cpgs >= min.cpgs, ]
-      res_ls[[1]] <- results_df
-      
-    }
-    
     results_df <- res_ls[[1]]
     keepRows <- rowSums(is.na(results_df)) != ncol(results_df)
     results_df <- results_df[keepRows, ]
