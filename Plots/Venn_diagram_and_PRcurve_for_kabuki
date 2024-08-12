@@ -23,35 +23,60 @@ BuildOverlaps <- function(BestResultsDir,
   allRes_ls <- lapply(correctNames_char, function(x){
     
     res_ls <- readRDS(paste0(BestResultsDir, x))
-    
-    if(grepl("ProbeLasso", x)){
       
-      ranges_df <- res_ls[[1]]
-      results_df<- ranges_df[ranges_df$dmr.n.cpgs > 2 & ranges_df$dmr.pval < 0.05 & abs((ranges_df$betaAv_Control)-(ranges_df$betaAv_Kabuki)) > 0.1,  ]
-    } else {
-      ranges_df <- res_ls[[1]]
-      res_ls[[1]] <-ranges_df[ranges_df$dmr.n.cpgs > 2 & ranges_df$dmr.pval < 0.05 & abs(ranges_df$maxdiff)> 0.1, ]
+      if(grepl("ProbeLasso", x)){
+        
+        ranges_df <- res_ls[[1]]
+        results_df <-ranges_df[ranges_df$dmr.n.cpgs > 2 & ranges_df$dmr.pval < 0.05 & abs((ranges_df$betaAv_Control)-(ranges_df$betaAv_Kabuki)) > 0.1,  ]
+        
+        
+        # The raw Comb-p results were filtered to > 1, not > 4.
+        results_df <- results_df[results_df$dmr.n.cpgs >= min.cpgs, ]
+        res_ls[[1]] <- results_df
+        
       }
-  
-  results_df <- res_ls[[1]]
-  keepRows <- rowSums(is.na(results_df)) != ncol(results_df)
-  results_df <- results_df[keepRows, ]
-  
-    
-    if(nrow(results_df) > 0){
+    if(grepl("idDMR", x))
+    {
       
-      results_IRanges <- IRanges(
-        start = results_df$dmr.start,
-        end = results_df$dmr.end
-      )
-      GRanges(
-        seqnames = results_df$dmr.chr,
-        ranges = results_IRanges
-      )
+      ranges_df <- res_ls[[1]]
+      results_df <-ranges_df[ranges_df$dmr.n.cpgs > 2 & ranges_df$dmr.pval < 0.05 & abs(ranges_df$meandiff)> 0.1,  ]
+      
+      
+      # The raw Comb-p results were filtered to > 1, not > 4.
+      results_df <- results_df[results_df$dmr.n.cpgs >= min.cpgs, ]
+      res_ls[[1]] <- results_df
       
     }
-  
-  })
+    if(grepl("DMRcate",x)){
+      
+      ranges_df <- res_ls[[1]]
+      results_df <-ranges_df[ranges_df$dmr.n.cpgs > 2 & ranges_df$dmr.pval < 0.05 & abs(ranges_df$meandiff)> 0.1,  ]
+      
+      
+      # The raw Comb-p results were filtered to > 1, not > 4.
+      results_df <- results_df[results_df$dmr.n.cpgs >= min.cpgs, ]
+      res_ls[[1]] <- results_df
+      
+    }
+    
+    results_df <- res_ls[[1]]
+      keepRows <- rowSums(is.na(results_df)) != ncol(results_df)
+      results_df <- results_df[keepRows, ]
+      
+      if(nrow(results_df) > 0){
+        
+        results_IRanges <- IRanges(
+          start = results_df$dmr.start,
+          end = results_df$dmr.end
+        )
+        GRanges(
+          seqnames = results_df$dmr.chr,
+          ranges = results_IRanges
+        )
+        
+      }
+      
+    })
   
   ###  Return  ###
   attr(allRes_ls, "size") <- size
@@ -59,7 +84,6 @@ BuildOverlaps <- function(BestResultsDir,
   allRes_ls
   
 }
-
 
 
 PlotOverlaps <- function(BestResultsDir,
@@ -133,6 +157,9 @@ PlotOverlaps <- function(BestResultsDir,
     dev.off()
   }
 }
+
+
+
 ######### Build a PR curve list for each function best results #############
 BuildPRcurve <- function(BestResultsDir,
                          size =11,
@@ -164,9 +191,17 @@ BuildPRcurve <- function(BestResultsDir,
       CleanResults_PB(dmrResults_ls = res_ls,
                       Kabuki_dmr_df)
       
-    } else {CleanResults(dmrResults_ls = res_ls,
-                         Kabuki_dmr_df)}
-  })
+    } 
+    if(grepl("DMRcate",x)){
+      
+      CleanResults(dmrResults_ls = res_ls,
+                      Kabuki_dmr_df)
+      } 
+    if(grepl("idDMR",x)){
+      
+      CleanResults(dmrResults_ls = res_ls,
+                   Kabuki_dmr_df)}
+    })
   
   ###  Build PR Curves  ###
   allPRs_ls <- lapply(allRes_ls, function(cleanDMR_df){
